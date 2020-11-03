@@ -1,0 +1,15 @@
+server:
+  port: 8083
+
+gateway:
+  server:
+    host: 127.0.0.1
+    port: 7777
+
+  routes:
+    -
+      path: /benchmark
+      urls:
+        - 127.0.0.1:25030
+        - 127.0.0.1:25031
+        - 127.0.0.1:25032
