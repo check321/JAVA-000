@@ -1,17 +1,16 @@
 package net.check321.gatewaydemo.client;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
+import io.netty.util.Attribute;
 import lombok.extern.slf4j.Slf4j;
 import net.check321.gatewaydemo.client.handler.input.HttpContentInboundHandler;
+import net.check321.gatewaydemo.config.Attributes;
 import net.check321.gatewaydemo.config.GatewayConfig;
 import org.springframework.stereotype.Component;
-import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
@@ -26,7 +25,7 @@ public class NettyHttpClient {
         this.gatewayConfig = gatewayConfig;
     }
 
-    public void call(ChannelHandlerContext requestChannelContext, String forwardingStr){
+    public void call(ChannelHandlerContext requestChannelCtx, String forwardingStr){
 
         NioEventLoopGroup workGroup = new NioEventLoopGroup();
         try {
@@ -42,7 +41,7 @@ public class NettyHttpClient {
                 ch.pipeline().addLast(new HttpRequestEncoder());
 
                 // http response handler.
-                ch.pipeline().addLast(new HttpContentInboundHandler(requestChannelContext));
+                ch.pipeline().addLast(new HttpContentInboundHandler(requestChannelCtx));
             }
         });
 
@@ -51,9 +50,10 @@ public class NettyHttpClient {
                     , forwardingURL.getPath());
 
             request.headers().set(HttpHeaderNames.HOST, forwardingURL.getHost());
-            request.headers().set("nio","fyang");
 
-            log.info(request.toString());
+            // customized request-header.
+            final GatewayConfig.Header headerAttr = requestChannelCtx.channel().attr(Attributes.HEADER).get();
+            request.headers().set(headerAttr.getKey(),headerAttr.getValue());
 
             Channel channel = bootstrap.connect(forwardingURL.getHost()
                     , forwardingURL.getPort()).sync().channel();

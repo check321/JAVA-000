@@ -1,15 +1,23 @@
 server:
   port: 8083
 
+# Gateway配置
 gateway:
   server:
     host: 127.0.0.1
     port: 7777
 
+# 路由配置
   routes:
     -
+      #  path可做为服务名区分代理服务
       path: demo
+      # urls作为负载列表，实际可替换为注册中心拉取
       urls:
         - 127.0.0.1:25030
-        # - 127.0.0.1:25031
-        # - 127.0.0.1:25032
+        - 127.0.0.1:25031
+        - 127.0.0.1:25032
+  # Request-Header 过滤配置
+  header:
+    key: nio
+    value: fyang

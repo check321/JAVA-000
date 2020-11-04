@@ -17,7 +17,9 @@ import io.netty.handler.logging.LoggingHandler;
 import lombok.extern.slf4j.Slf4j;
 import net.check321.gatewaydemo.config.GatewayConfig;
 import net.check321.gatewaydemo.server.handler.input.HttpForwardingInboundHandler;
+import net.check321.gatewaydemo.server.handler.input.HttpHeaderInboundHandler;
 import net.check321.gatewaydemo.server.handler.input.RandomRouteInboundHandler;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -32,10 +34,13 @@ public class GatewayServer {
 
     private final GatewayConfig gatewayConfig;
 
-    public GatewayServer(GatewayConfig gatewayConfig, RandomRouteInboundHandler randomRouteInboundHandler, HttpForwardingInboundHandler httpForwardingInboundHandler) {
+    private final HttpHeaderInboundHandler httpHeaderInboundHandler;
+
+    public GatewayServer(GatewayConfig gatewayConfig, RandomRouteInboundHandler randomRouteInboundHandler, HttpForwardingInboundHandler httpForwardingInboundHandler, HttpHeaderInboundHandler httpHeaderInboundHandler) {
         this.gatewayConfig = gatewayConfig;
         this.randomRouteInboundHandler = randomRouteInboundHandler;
         this.httpForwardingInboundHandler = httpForwardingInboundHandler;
+        this.httpHeaderInboundHandler = httpHeaderInboundHandler;
     }
 
     @PostConstruct
@@ -69,6 +74,7 @@ public class GatewayServer {
                             ch.pipeline().addLast(new HttpServerCodec());
                             ch.pipeline().addLast(new HttpObjectAggregator(1024 * 1024));
                             ch.pipeline().addLast(randomRouteInboundHandler); // routing.
+                            ch.pipeline().addLast(httpHeaderInboundHandler); // request-header filter.
                             ch.pipeline().addLast(httpForwardingInboundHandler);// forwarding.
                         }
                     });

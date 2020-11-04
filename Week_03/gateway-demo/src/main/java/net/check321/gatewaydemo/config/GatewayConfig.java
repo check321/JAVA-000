@@ -21,6 +21,8 @@ public class GatewayConfig {
 
     private Map<String,List<String>> routesMap;
 
+    private Header header;
+
     @PostConstruct
     private void init() {
         if (CollectionUtils.isEmpty(routes)) {
@@ -46,6 +48,15 @@ public class GatewayConfig {
         private String path; // foo-service
 
         private List<String> urls; // [127.0.0.1,127.0.0.2]
+
+    }
+
+    @Data
+    public static class Header{
+
+        private String key;
+
+        private String value;
 
     }
 }

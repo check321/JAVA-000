@@ -5,13 +5,11 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import lombok.extern.slf4j.Slf4j;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
-import static io.netty.handler.codec.http.HttpHeaderValues.KEEP_ALIVE;
 import static org.springframework.http.HttpHeaders.*;
 
 /**
@@ -42,11 +40,10 @@ public class HttpContentInboundHandler extends ChannelInboundHandlerAdapter {
         if(msg instanceof HttpContent){
             final HttpContent content = (HttpContent) msg;
             ByteBuf byteBuf = Unpooled.wrappedBuffer(content.content());
-
             DefaultFullHttpResponse response =
                     new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, byteBuf);
 
-            String res = byteBuf.toString(Charset.forName("utf8"));
+            String res = byteBuf.toString(StandardCharsets.UTF_8);
 
             try {
                 response.headers().setInt(CONTENT_LENGTH, res.length());
@@ -59,6 +56,9 @@ public class HttpContentInboundHandler extends ChannelInboundHandlerAdapter {
                 }else {
                     requestChannelContext.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
                 }
+
+                requestChannelContext.close();
+                ctx.close();
             }
         }
 
