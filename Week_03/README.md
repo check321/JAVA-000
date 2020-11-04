@@ -5,7 +5,9 @@
 基于Netty仿写网关组件，完成路由、过滤、负载等功能。
 
 ### 组件结构
-> └── net
+
+```
+└── net
     └── check321
         └── gatewaydemo 
             ├── GatewayDemoApplication.java  [启动类，借助了SpringIOC，所以依然是个web项目]
@@ -25,6 +27,7 @@
                     │   ├── HttpHeaderInboundHandler.java
                     │   └── RandomRouteInboundHandler.java
                     └── output
+```
 
 ```yaml
 # Gateway配置
