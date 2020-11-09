@@ -14,12 +14,12 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
 import lombok.extern.slf4j.Slf4j;
 import net.check321.gatewaydemo.config.GatewayConfig;
 import net.check321.gatewaydemo.server.handler.input.HttpForwardingInboundHandler;
-import net.check321.gatewaydemo.server.handler.input.HttpHeaderInboundHandler;
 import net.check321.gatewaydemo.server.handler.input.RandomRouteInboundHandler;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -34,13 +34,13 @@ public class GatewayServer {
 
     private final GatewayConfig gatewayConfig;
 
-    private final HttpHeaderInboundHandler httpHeaderInboundHandler;
+//    private final HttpHeaderInboundHandler httpHeaderInboundHandler;
 
-    public GatewayServer(GatewayConfig gatewayConfig, RandomRouteInboundHandler randomRouteInboundHandler, HttpForwardingInboundHandler httpForwardingInboundHandler, HttpHeaderInboundHandler httpHeaderInboundHandler) {
+    public GatewayServer(GatewayConfig gatewayConfig, RandomRouteInboundHandler randomRouteInboundHandler, HttpForwardingInboundHandler httpForwardingInboundHandler) {
         this.gatewayConfig = gatewayConfig;
         this.randomRouteInboundHandler = randomRouteInboundHandler;
         this.httpForwardingInboundHandler = httpForwardingInboundHandler;
-        this.httpHeaderInboundHandler = httpHeaderInboundHandler;
+//        this.httpHeaderInboundHandler = httpHeaderInboundHandler;
     }
 
     @PostConstruct
@@ -65,6 +65,9 @@ public class GatewayServer {
                     .childOption(ChannelOption.SO_KEEPALIVE, true)
                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
 
+            final UnorderedThreadPoolEventExecutor ioWorkerThreadPool =
+                    new UnorderedThreadPoolEventExecutor(18, new DefaultThreadFactory("io-worker"));
+
             boot.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
                     .handler(new LoggingHandler(LogLevel.INFO))
@@ -74,8 +77,9 @@ public class GatewayServer {
                             ch.pipeline().addLast(new HttpServerCodec());
                             ch.pipeline().addLast(new HttpObjectAggregator(1024 * 1024));
                             ch.pipeline().addLast(randomRouteInboundHandler); // routing.
-                            ch.pipeline().addLast(httpHeaderInboundHandler); // request-header filter.
-                            ch.pipeline().addLast(httpForwardingInboundHandler);// forwarding.
+//                            ch.pipeline().addLast(httpHeaderInboundHandler); // request-header filter.
+//                            ch.pipeline().addLast(httpForwardingInboundHandler);
+                            ch.pipeline().addLast(ioWorkerThreadPool,httpForwardingInboundHandler);// forwarding.
                         }
                     });
 

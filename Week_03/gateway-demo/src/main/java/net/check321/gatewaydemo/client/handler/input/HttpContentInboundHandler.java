@@ -31,11 +31,11 @@ public class HttpContentInboundHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
 
         String contentType = "";
-        if(msg instanceof HttpResponse){
+     /*   if(msg instanceof HttpResponse){
             HttpResponse response = (HttpResponse) msg;
             contentType = response.headers().get(CONTENT_TYPE);
             log.info("Content-type: [{}]",contentType);
-        }
+        }*/
 
         if(msg instanceof HttpContent){
             final HttpContent content = (HttpContent) msg;
@@ -47,7 +47,8 @@ public class HttpContentInboundHandler extends ChannelInboundHandlerAdapter {
 
             try {
                 response.headers().setInt(CONTENT_LENGTH, res.length());
-                response.headers().set(CONTENT_TYPE,contentType);
+                response.headers().set(CONTENT_TYPE,"text/html;charset=UTF-8");
+                response.headers().set(CONNECTION,"keep-alive");
             } catch (Exception e) {
                 response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
             } finally {

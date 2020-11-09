@@ -6,6 +6,8 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.util.Attribute;
+import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
 import lombok.extern.slf4j.Slf4j;
 import net.check321.gatewaydemo.client.handler.input.HttpContentInboundHandler;
 import net.check321.gatewaydemo.config.Attributes;
@@ -28,6 +30,7 @@ public class NettyHttpClient {
     public void call(ChannelHandlerContext requestChannelCtx, String forwardingStr){
 
         NioEventLoopGroup workGroup = new NioEventLoopGroup();
+
         try {
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.group(workGroup);
@@ -52,8 +55,8 @@ public class NettyHttpClient {
             request.headers().set(HttpHeaderNames.HOST, forwardingURL.getHost());
 
             // customized request-header.
-            final GatewayConfig.Header headerAttr = requestChannelCtx.channel().attr(Attributes.HEADER).get();
-            request.headers().set(headerAttr.getKey(),headerAttr.getValue());
+//            final GatewayConfig.Header headerAttr = requestChannelCtx.channel().attr(Attributes.HEADER).get();
+//            request.headers().set(headerAttr.getKey(),headerAttr.getValue());
 
             Channel channel = bootstrap.connect(forwardingURL.getHost()
                     , forwardingURL.getPort()).sync().channel();
