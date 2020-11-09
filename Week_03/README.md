@@ -90,6 +90,76 @@ nio: fyang]
 hi, fyang
 ```
 
+### HttpForwardingInboundHandler IO模型改进
+对于网关内部负责处理网络请求代理服务的`HttpForwardingInboundHandler`明显是一个**IO密集型**处理器，在实际业务中会因为代理服务的处理速度，从而占用网关服务端workerGroup线程的执行时间，所以在此需要通过单独的线程池去处理。
+
+使用wrk进行对比压测：
+
+- 机器配置：8核16线程
+
+- 压测指标：4线程 100请求并发
+
+- 引入线程池前：
+> nuc@fyangdeMac-mini ~ % wrk -c 100 -t 4 --timeout 10s http://127.0.0.1:7777/demo/fyang
+Running 10s test @ http://127.0.0.1:7777/demo/fyang
+  4 threads and 100 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     3.03s     2.79ms   3.04s    75.00%
+    Req/Sec     2.00      0.00     2.00    100.00%
+  16 requests in 10.05s, 1.70KB read
+  Socket errors: connect 0, read 16, write 0, timeout 0
+Requests/sec:      1.59
+Transfer/sec:     173.49B
+
+- 根据IO密集型特性创建18线程的线程池 （CPU核心 * 2 + 2）
+```java
+final UnorderedThreadPoolEventExecutor ioWorkerThreadPool =
+                    new UnorderedThreadPoolEventExecutor(18, new DefaultThreadFactory("io-worker"));
+
+// 线程池绑定 HttpForwardingInboundHandler
+  ch.pipeline().addLast(ioWorkerThreadPool,httpForwardingInboundHandler);
+```
+
+- 引入线程池后：
+> nuc@fyangdeMac-mini ~ % wrk -c 100 -t 4 --timeout 10s http://127.0.0.1:7777/demo/fyang
+Running 10s test @ http://127.0.0.1:7777/demo/fyang
+  4 threads and 100 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     6.21s     2.51s    9.25s    33.33%
+    Req/Sec     0.91      0.83     3.00     63.64%
+  54 requests in 10.06s, 5.75KB read
+  Socket errors: connect 0, read 54, write 0, timeout 0
+Requests/sec:      5.37
+Transfer/sec:     585.27B
+
+- 控制台输出：
+> 2020-11-10 01:00:53.794  INFO 5977 --- [ io-worker-4-11] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:53.794  INFO 5977 --- [  io-worker-4-6] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:53.794  INFO 5977 --- [  io-worker-4-3] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:53.794  INFO 5977 --- [ io-worker-4-17] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:53.795  INFO 5977 --- [  io-worker-4-7] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:53.795  INFO 5977 --- [ io-worker-4-15] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:53.796  INFO 5977 --- [ io-worker-4-18] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:53.796  INFO 5977 --- [  io-worker-4-9] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:53.798  INFO 5977 --- [ io-worker-4-10] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:53.798  INFO 5977 --- [  io-worker-4-2] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.702  INFO 5977 --- [  io-worker-4-4] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.703  INFO 5977 --- [ io-worker-4-13] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.773  INFO 5977 --- [  io-worker-4-8] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.811  INFO 5977 --- [  io-worker-4-5] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.813  INFO 5977 --- [ io-worker-4-16] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.813  INFO 5977 --- [ io-worker-4-14] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.816  INFO 5977 --- [ io-worker-4-15] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.816  INFO 5977 --- [  io-worker-4-6] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.817  INFO 5977 --- [ io-worker-4-17] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.818  INFO 5977 --- [  io-worker-4-2] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+2020-11-10 01:00:56.818  INFO 5977 --- [ io-worker-4-10] n.c.g.s.h.i.HttpForwardingInboundHandler : current route: [http://127.0.0.1:25030/demo/fyang]
+
+
+- 可见大量IO请求操作被交由特定线程池处理（ io-worker-4-xx）
+- 系统的吞吐量得到明显提升：  `16 requests in 10.05s, 1.70KB read ->  54 requests in 10.06s, 5.75KB read`
+- **可是这里为何延迟也衰减一倍**： `3.03s ->  6.21s`
+
 ## Netty Gateway: BECH 构成
 
 ### Bootstrap
