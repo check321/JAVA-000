@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  net.check321.springbootstarterdemo.config.FooAutoConfiguration
