@@ -18,7 +18,7 @@ public class BatchInsertByJDBC {
 
     private static final String U_NAME = "root";
 
-    private static final String PWD = "123456";
+    private static final String PWD = "";
 
     private static final String MOCK_USER_TEMPLETE = "U{0,number,#},name_{1,number,#},12345";
 
@@ -34,7 +34,9 @@ public class BatchInsertByJDBC {
             users.add(MessageFormat.format(MOCK_USER_TEMPLETE,i,i));
         }
 
+        long start = System.currentTimeMillis();
         execInBatch(users);
+        log.info("total spend: [{}] ms ", System.currentTimeMillis() - start);
     }
 
 
