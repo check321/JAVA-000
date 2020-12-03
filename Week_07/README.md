@@ -113,3 +113,130 @@ Slave_SQL_Running: Yes
 
 
 - 从库显示成功同步100w条数据
+
+
+#### 动态切分主从库
+
+```
+├── src
+│   ├── main
+│   │   ├── java
+│   │   │   └── net
+│   │   │       └── check321
+│   │   │           └── databasedemo
+│   │   │               ├── DatabaseDemoApplication.java
+│   │   │               ├── annotation
+│   │   │               │   └── ReadOnly.java [注解标记只读操作切分到从库]
+│   │   │               ├── aspect
+│   │   │               │   └── DynamicDataSourceAspect.java [AOP降低对业务代码的侵入]
+│   │   │               ├── conf
+│   │   │               │   ├── DataSourceConfiguration.java [主从库数据源配置]
+│   │   │               │   ├── DataSourceNode.java [主从库标记]
+│   │   │               │   └── DynamicDataSource.java 
+│   │   │               ├── entity
+│   │   │               │   └── User.java [测试业务实体对象]
+│   │   │               ├── jdbc
+│   │   │               │   └── BatchInsertByJDBC.java [作业1：批量插入100w条数据 测试约10s]
+│   │   │               ├── mapper
+│   │   │               │   └── UserMapper.java [实体Mapper]
+│   │   │               └── util
+│   │   │                   └── DynamicDataSourceCtxHolder.java [当前线程数据容器]
+│   │   └── resources
+│   │       └── application.yml
+│   └── test
+│       └── java
+│           └── net
+│               └── check321
+│                   └── databasedemo
+│                       ├── DatabaseDemoApplicationTests.java
+│                       └── DynamicSourceNodeTest.java [动态数据源测试]
+```
+
+#####  核心实现
+
+- 继承`AbstractRoutingDataSource`通过`determineCurrentLookupKey()`实现数据源选取策略
+```
+public class DynamicDataSource extends AbstractRoutingDataSource {
+
+    @Override
+    protected Object determineCurrentLookupKey() {
+        return DynamicDataSourceCtxHolder.getDatasourceNode();
+    }
+}
+```
+
+- 配置主从数据源集合并注册于`DataSource`
+
+```
+@Configuration
+@MapperScan(basePackages = "net.check321.databasedemo.mapper" )
+public class DataSourceConfiguration {
+
+    @Bean(DataSourceNode.MASTER_NODE)
+    @ConfigurationProperties("spring.datasource.master")
+    public DataSource masterNode(){
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean(DataSourceNode.SLAVE_NODE)
+    @ConfigurationProperties("spring.datasource.slave")
+    public DataSource slaveNode(){
+        return DataSourceBuilder.create().build();
+    }
+
+   @Bean
+   @Primary
+   public DataSource dynamicDataSource(){
+
+       Map<Object, Object> nodeMap = new HashMap<>();
+       nodeMap.put(DataSourceNode.MASTER_NODE,masterNode());
+       nodeMap.put(DataSourceNode.SLAVE_NODE,slaveNode());
+
+       DynamicDataSource dynamicDataSource = new DynamicDataSource();
+       dynamicDataSource.setTargetDataSources(nodeMap);
+       dynamicDataSource.setDefaultTargetDataSource(masterNode());
+
+       return dynamicDataSource;
+   }
+
+}
+```
+
+- 自定义注解`@ReadOnly`标识只读操作
+
+ 
+
+```
+	@ReadOnly
+    @Results({
+            @Result(property = "userCode",column = "user_code"),
+            @Result(property = "userName",column = "user_name")
+    })
+    @Select("select * from t_user where id = #{id}")
+    User getById(@Param("id") Long id);
+```
+
+- 切面于`@ReadOnly`作为切点并利用线程数据容器切换数据源标识
+
+```
+   @Around("dataSourcePointCut()")
+    public Object around(ProceedingJoinPoint jp) throws Throwable {
+        // @ReadOnly 读操作走从库
+        DynamicDataSourceCtxHolder.setDatasourceNode(DataSourceNode.SLAVE_NODE);
+        try {
+            return jp.proceed();
+        }finally {
+            DynamicDataSourceCtxHolder.clean();
+        }
+
+    }
+```
+
+- 测试
+  1. 插入数据`sharding_test_02`后，观察自动同步至从库主键`1000003`
+  2. 修改从库`1000003`数据至`sharding_test_02_slave`
+  3. 查询`1000003`数据：`sharding_test_02_slave`，动态切分成功
+
+```
+INFO 50341 --- [           main] n.c.databasedemo.DynamicSourceNodeTest   : query record: User(id=1000003, userCode=sharding_02_slave, userName=sharding_test_02, password=123456)
+```

@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    master:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      jdbc-url: jdbc:mysql://localhost:3306/mall-demo?useSSL=false&serverTimezone=GMT%2B8&characterEncoding=UTF-8
+      username: root
+      password:
+
+    slave:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      jdbc-url: jdbc:mysql://localhost:4406/mall-demo?useSSL=false&serverTimezone=GMT%2B8&characterEncoding=UTF-8
+      username: root
+      password:
+
